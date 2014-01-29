@@ -166,6 +166,9 @@ exports.getTime = function (callback) {
 // Returns: time, [Series], [Episode], [Banner]
 exports.getUpdates = function (timeframe, callback) {
 
+	// timeframe can only be day, week, month or all (default: day)
+	timeframe = {day: 'day', week: 'week', month: 'month', all: 'all'}[timeframe] || 'day';
+
 	getZippedXmlAsJS(
 		util.format('%s/api/%s/updates/updates_%s.zip', mirror, apiKey, timeframe),
 		callback
