@@ -26,27 +26,24 @@ var parserOpts = {
 
 // Turns XML to JS (also removes unnessesary stuff)
 var parseXml = function (xml, callback) {
-	var err, keys;
+	var keys;
 	var js = parser.toJson(xml, parserOpts);
 
 	if (js.Error) {
-		err = js.Error;
-		js = null;
-	}
-	else {
-		keys = Object.keys(js);
 
-		if (keys.length === 1) {
-			// Not sure if removing all keys[0] if length is 1, so starting with Data and Items..
-			if (keys[0] === 'Data') {
-				js = js.Data;
-			}
-			else if (keys[0] === 'Items') {
-				js = js.Items;
-			}
+		callback(js.Error, null);
+		return;
+	}
+	keys = Object.keys(js);
+	if (keys.length === 1) {
+		// Not sure if removing all keys[0] if length is 1 is a good idea, so starting with Data and Items..
+		if (keys[0] === 'Data') {
+			js = js.Data;
+		}
+		else if (keys[0] === 'Items') {
+			js = js.Items;
 		}
 	}
-
 	callback(err, js);
 };
 
@@ -54,13 +51,11 @@ var parseXml = function (xml, callback) {
 var getXmlAsJS = function (file_url, callback) {
 	console.log(file_url);
 	request(file_url, function (err, res, body) {
-		if (!err && res.statusCode == 200) {
-
-			parseXml(body, callback);
+		if (err || res.statusCode !== 200) {
+			callback(err, null);
+			return;
 		}
-		else {
-			callback(err);
-		}
+		parseXml(body, callback);
 	});
 };
 
@@ -78,16 +73,13 @@ var getZippedXmlAsJS = function (file_url, callback) {
 			entry.on('end', function () {
 
 				parseXml(xmldata, function (err, data) {
-					var dataType;
-
 					if (err) {
 						callback(err, null);
+						return;
 					}
-					else {
-						Object.keys(data).forEach(function (dataType) {
-							result_data[dataType] = data[dataType];
-						});
-					}
+					Object.keys(data).forEach(function (dataType) {
+						result_data[dataType] = data[dataType];
+					});
 				})
 			});
 		})
