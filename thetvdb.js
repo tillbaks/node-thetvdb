@@ -65,7 +65,7 @@ var getXmlAsJS = function (file_url, callback) {
 };
 
 // Downloads a zip file and extracts all xml files inside and returns it as a JS object
-var getZipXmlAsJS = function (file_url, callback) {
+var getZippedXmlAsJS = function (file_url, callback) {
 	console.log(file_url);
 	var result_data = {};
 	request(file_url)
@@ -84,8 +84,9 @@ var getZipXmlAsJS = function (file_url, callback) {
 						callback(err, null);
 					}
 					else {
-						dataType = Object.keys(data)[0] || '';
-						result_data[dataType] = data[dataType];
+						Object.keys(data).forEach(function (dataType) {
+							result_data[dataType] = data[dataType];
+						});
 					}
 				})
 			});
@@ -169,12 +170,12 @@ exports.getTime = function (callback) {
 	return this;
 };
 
-// API URL: <mirror>/api/Updates.php?type=all&time=<time>
-// Returns: [series_id], [episode_id]
-exports.getUpdates = function (time, callback) {
+// API URL: <mirror>/api/<apikey>/updates/updates_<timeframe>.zip
+// Returns: time, [Series], [Episode], [Banner]
+exports.getUpdates = function (timeframe, callback) {
 
-	getXmlAsJS(
-		util.format('%s/api/Updates.php?type=all&time=%s', mirror, time),
+	getZippedXmlAsJS(
+		util.format('%s/api/%s/updates/updates_%s.zip', mirror, apiKey, timeframe),
 		callback
 	);
 	return this;
@@ -206,7 +207,7 @@ exports.getSeriesById = function (series_id, callback) {
 // Returns: Series, [Episode], [Actor], [Banner]
 exports.getSeriesAllById = function (series_id, callback) {
 
-	getZipXmlAsJS(
+	getZippedXmlAsJS(
 		util.format('%s/api/%s/series/%s/all/%s.zip', mirror, apiKey, series_id, language),
 		callback
 	);
