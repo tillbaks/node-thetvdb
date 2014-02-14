@@ -44,7 +44,7 @@ var parseXml = function (xml, callback) {
 			js = js.Items;
 		}
 	}
-	callback(err, js);
+	callback(null, js);
 };
 
 // Downloads a xml file and returns it as a JS object
