@@ -16,7 +16,7 @@ var mirror = 'http://www.thetvdb.com';
 var parserOpts = {
 	object: true,
 	reversible: false,
-	sanitize: true,
+	sanitize: false,
 	coerce: true,
 	trim: false,
 	arrayNotation: false
@@ -98,6 +98,85 @@ var downloadFile = function (file_url, filename, callback) {
 		.on('close', callback);
 };
 
+
+// |Apes|Oranges|Man => [Apes, Oranges, Man]
+var splitPipeToArray = function (string) {
+	if (typeof string !== 'string') {
+		return [];
+	}
+	return string.split('|').filter(function (n) { return n; });
+};
+// Same as above but uses selectors to process multiple arrays of piped strings to arrays
+var splitPipeToArrayEach = function (data, selectors) {
+
+	if (!Array.isArray(selectors)) {
+		selectors = [selectors];
+	}
+
+	if (Array.isArray(data)) {
+
+		data.forEach(function (item) {
+			selectors.forEach(function (selector) {
+				item[selector] = splitPipeToArray(item[selector]);
+			});
+		});
+	}
+	else {
+		selectors.forEach(function (selector) {
+			data[selector] = splitPipeToArray(data[selector]);
+		});
+	}
+
+	return data;
+};
+// Loops through anything and converts all empty objects to empty strings
+var emptyObjectsToString = function (thing) {
+
+		if (typeof thing === 'object') {
+			if (Object.keys(thing).length === 0) {
+				return '';
+			}
+			else {
+				Object.keys(thing).forEach(function (propName) {
+					thing[propName] = emptyObjectsToString(thing[propName]);
+				});
+				return thing;
+			}
+		}
+		else if (Array.isArray(thing)) {
+			thing.forEach(function (newThing) {
+				newThing = emptyObjectsToString(newThing);
+			});
+			return thing;
+		}
+		else {
+			return thing;
+		}
+}
+var prepareOutputData = function (data) {
+
+	if (data.Actors) {
+		data.Actors = data.Actors.Actor;
+	}
+	if (data.Banners) {
+		data.Banners = splitPipeToArrayEach(data.Banners.Banner, 'Colors');
+	}
+	if (data.Episode) {
+		data.Episode = splitPipeToArrayEach(data.Episode, ['GuestStars', 'Director', 'Writer']);
+	}
+	if (data.Series) {
+		data.Series = splitPipeToArrayEach(data.Series, ['Actors', 'Genre']);
+	}
+	if (data.Languages) {
+		data.Languages = data.Languages.Language;
+	}
+
+	// Convert empty objects to empty strings
+	emptyObjectsToString(data);
+
+	return data;
+};
+
 // * PUBLIC FUNCTIONS
 
 exports.apiKey = function (data) {
@@ -146,18 +225,7 @@ exports.getLanguages = function (callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/%s/languages.xml', mirror, apiKey),
-		callback
-	);
-	return this;
-};
-
-// API URL: <mirror>/api/Updates.php?type=none
-// Returns: Time
-exports.getTime = function (callback) {
-
-	getXmlAsJS(
-		util.format('%s/api/Updates.php?type=none', mirror),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Languages); }
 	);
 	return this;
 };
@@ -182,7 +250,7 @@ exports.getSeries = function (series_name, callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/GetSeries.php?seriesname=%s', mirror, series_name),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Series); }
 	);
 	return this;
 };
@@ -193,7 +261,7 @@ exports.getSeriesById = function (series_id, callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/%s/series/%s/%s.xml', mirror, apiKey, series_id, language),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Series); }
 	);
 	return this;
 };
@@ -204,7 +272,16 @@ exports.getSeriesAllById = function (series_id, callback) {
 
 	getZippedXmlAsJS(
 		util.format('%s/api/%s/series/%s/all/%s.zip', mirror, apiKey, series_id, language),
-		callback
+		function (err, data) {
+
+			data = prepareOutputData(data);
+
+			data.Series.Actors = data.Actors;
+			data.Series.Banners = data.Banners;
+			data.Series.Episodes = data.Episode;
+
+			callback(err, data.Series);
+		}
 	);
 	return this;
 };
@@ -215,7 +292,7 @@ exports.getEpisodeById = function (episode_id, callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/%s/episodes/%s/%s.xml', mirror, apiKey, episode_id, language),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Episode); }
 	);
 	return this;
 };
@@ -226,7 +303,7 @@ exports.getEpisodeByAirDate = function (series_id, season_num, episode_num, call
 
 	getXmlAsJS(
 		util.format('%s/api/%s/series/%s/default/%s/%s/%s.xml', mirror, apiKey, series_id, season_num, episode_num, language),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Episode); }
 	);
 	return this;
 };
@@ -237,7 +314,7 @@ exports.getEpisodeByDVD = function (series_id, season_num, episode_num, callback
 
 	getXmlAsJS(
 		util.format('%s/api/%s/series/%s/dvd/%s/%s/%s.xml', mirror, apiKey, series_id, season_num, episode_num, language),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Episode); }
 	);
 	return this;
 };
@@ -248,7 +325,7 @@ exports.getEpisodeByAbsolute = function (series_id, absolute_num, callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/%s/series/%s/default/%s/%s.xml', mirror, apiKey, series_id, absolute_num, language),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Episode); }
 	);
 	return this;
 };
@@ -259,7 +336,7 @@ exports.getActors = function (series_id, callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/%s/series/%s/actors.xml', mirror, apiKey, series_id),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data).Actors); }
 	);
 	return this;
 };
@@ -270,7 +347,7 @@ exports.getBanners = function (series_id, callback) {
 
 	getXmlAsJS(
 		util.format('%s/api/%s/series/%s/banners.xml', mirror, apiKey, series_id),
-		callback
+		function (err, data) { callback(err, prepareOutputData(data)); }
 	);
 	return this;
 };
